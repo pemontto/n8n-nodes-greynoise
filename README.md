@@ -1,8 +1,6 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
-
 # n8n-nodes-greynoise
 
-<img src="./nodes/GreyNoise/greynoise.png" width=120 />
+![](./images/greynoise.png)
 
 This is an n8n community node for interacting with the [GreyNoise](https://viz.greynoise.io/) cybersecurity platform.
 
