@@ -22,14 +22,14 @@ export class GreyNoiseApi implements ICredentialType {
 	// stating how this credential is injected as part of the request
 	// An example is the Http Request node that can make generic calls
 	// reusing this credential
-	authenticate = {
+	authenticate: IAuthenticateGeneric = {
 		type: 'generic',
 		properties: {
 			headers: {
 				key: '={{$credentials.token}}',
 			},
 		},
-	} as IAuthenticateGeneric;
+	};
 
 	// The block below tells how this credential can be tested
 	test: ICredentialTestRequest = {

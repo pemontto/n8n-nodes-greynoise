@@ -28,7 +28,6 @@ export class GreyNoise implements INodeType {
 		description: 'Interact with GreyNoise API',
 		defaults: {
 			name: 'GreyNoise',
-			color: '#3b4151',
 		},
 		inputs: ['main'],
 		outputs: ['main'],
