@@ -5,6 +5,7 @@ import {
 	IHttpRequestOptions,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionType
 } from 'n8n-workflow';
 
 export async function buildIPArray(
@@ -29,8 +30,8 @@ export class GreyNoise implements INodeType {
 		defaults: {
 			name: 'GreyNoise',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionType.Main],
+		outputs: [NodeConnectionType.Main],
 		credentials: [
 			{
 				name: 'greynoiseApi',
@@ -148,34 +149,34 @@ export class GreyNoise implements INodeType {
 							},
 						},
 					},
+					// {
+					// 	name: 'IP Context',
+					// 	value: 'ipContext',
+					// 	action: 'IP Context',
+					// 	hint: 'Get more information about a given IP address. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.',
+					// 	routing: {
+					// 		request: {
+					// 			url: '=/v2/noise/context/{{ $parameter.ip }}',
+					// 			ignoreHttpStatusErrors: true,
+					// 		},
+					// 	},
+					// },
+					// {
+					// 	name: 'IP Quick Check',
+					// 	value: 'ipQuick',
+					// 	action: 'IP Quick Check',
+					// 	hint: 'Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.',
+					// 	routing: {
+					// 		request: {
+					// 			url: '=/v2/noise/quick/{{ $parameter.ip }}',
+					// 			ignoreHttpStatusErrors: true,
+					// 		},
+					// 	},
+					// },
 					{
 						name: 'IP Context',
-						value: 'ipContext',
-						action: 'IP Context',
-						hint: 'Get more information about a given IP address. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.',
-						routing: {
-							request: {
-								url: '=/v2/noise/context/{{ $parameter.ip }}',
-								ignoreHttpStatusErrors: true,
-							},
-						},
-					},
-					{
-						name: 'IP Quick Check',
-						value: 'ipQuick',
-						action: 'IP Quick Check',
-						hint: 'Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.',
-						routing: {
-							request: {
-								url: '=/v2/noise/quick/{{ $parameter.ip }}',
-								ignoreHttpStatusErrors: true,
-							},
-						},
-					},
-					{
-						name: 'Multi-IP Context',
 						value: 'ipMultiConext',
-						action: 'Multi-IP Context',
+						action: 'IP Context',
 						hint: 'Get more information about a set of IP addresses. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.',
 						routing: {
 							request: {
@@ -186,9 +187,9 @@ export class GreyNoise implements INodeType {
 						},
 					},
 					{
-						name: 'Multi-IP Quick Check',
+						name: 'IP Quick Check',
 						value: 'ipMultiQuick',
-						action: 'Multi-IP Quick Check',
+						action: 'IP Quick Check',
 						hint: 'Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.',
 						routing: {
 							request: {
@@ -232,7 +233,7 @@ export class GreyNoise implements INodeType {
 						},
 					},
 				],
-				default: 'ipContext',
+				default: 'ipipMultiConextContext',
 			},
 			{
 				displayName: 'IP',
