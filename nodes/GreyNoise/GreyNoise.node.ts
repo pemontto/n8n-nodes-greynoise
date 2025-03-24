@@ -233,7 +233,7 @@ export class GreyNoise implements INodeType {
 						},
 					},
 				],
-				default: 'ipipMultiConextContext',
+				default: 'ipMultiConext',
 			},
 			{
 				displayName: 'IP',
