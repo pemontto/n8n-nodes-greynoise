@@ -1,6 +1,6 @@
-# n8n-nodes-greynoise
+<img src="https://raw.githubusercontent.com/pemontto/n8n-nodes-greynoise/master/icons/greynoise.svg" width="120" alt="GreyNoise Logo" />
 
-![](./images/greynoise.png)
+# n8n-nodes-greynoise
 
 This is an n8n community node for interacting with the [GreyNoise](https://viz.greynoise.io/) cybersecurity platform.
 
@@ -27,7 +27,7 @@ For users on n8n v0.187+, your instance owner can install this node from [Commun
 
 1. Go to **Settings > Community Nodes**.
 2. Select **Install**.
-3. Enter `n8n-nodes-ldap` in **Enter npm package name**.
+3. Enter `n8n-nodes-greynoise` in **Enter npm package name**.
 4. Agree to the [risks](https://docs.n8n.io/integrations/community-nodes/risks/) of using community nodes: select **I understand the risks of installing unverified code from a public source**.
 5. Select **Install**.
 
@@ -37,11 +37,11 @@ After installing the node, you can use it like any other node. n8n displays the 
 
 To get started install the package in your n8n root directory:
 
-`npm install n8n-nodes-ldap`
+`npm install n8n-nodes-greynoise`
 
 For Docker-based deployments add the following line before the font installation command in your [n8n Dockerfile](https://github.com/n8n-io/n8n/blob/master/docker/images/n8n/Dockerfile):
 
-`RUN cd /usr/local/lib/node_modules/n8n && npm install n8n-nodes-ldap`
+`RUN cd /usr/local/lib/node_modules/n8n && npm install n8n-nodes-greynoise`
 
 ## Operations
 
@@ -86,4 +86,4 @@ n8n v0.187+
 
 ## License
 
-[MIT](https://github.com/pemontto/n8n-nodes-ldap/blob/master/LICENSE.md)
+[MIT](LICENSE.md)
