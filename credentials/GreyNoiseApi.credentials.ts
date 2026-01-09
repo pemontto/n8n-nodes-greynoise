@@ -3,39 +3,42 @@ import {
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
+	Icon,
 } from 'n8n-workflow';
 
 export class GreyNoiseApi implements ICredentialType {
-	name = 'greynoiseApi';
+	name = 'greyNoiseApi';
 	displayName = 'GreyNoise API';
-	documentationUrl = 'https://example.com';
+	documentationUrl = 'https://docs.greynoise.io/docs/using-the-greynoise-community-api';
+	icon: Icon = {
+		light: 'file:../icons/greynoise.svg',
+		dark: 'file:../icons/greynoise.dark.svg',
+	};
+
 	properties: INodeProperties[] = [
 		{
-			displayName: 'Token',
-			name: 'token',
+			displayName: 'API Key',
+			name: 'apiKey',
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
+			required: true,
+			description:
+				'Your GreyNoise API key. Get one free at <a href="https://viz.greynoise.io/signup" target="_blank">viz.greynoise.io</a>.',
 		},
 	];
 
-	// This allows the credential to be used by other parts of n8n
-	// stating how this credential is injected as part of the request
-	// An example is the Http Request node that can make generic calls
-	// reusing this credential
 	authenticate: IAuthenticateGeneric = {
 		type: 'generic',
 		properties: {
 			headers: {
-				key: '={{$credentials.token}}',
+				key: '={{$credentials.apiKey}}',
 			},
 		},
 	};
 
-	// The block below tells how this credential can be tested
 	test: ICredentialTestRequest = {
 		request: {
-			// skipSslCertificateValidation: true,
 			baseURL: 'https://api.greynoise.io',
 			url: '/ping',
 		},

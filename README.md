@@ -47,34 +47,23 @@ For Docker-based deployments add the following line before the font installation
 
 ### Community
 
-- **Community IP**: Query IPs in the GreyNoise dataset
-  - `IP`: The IP to query
+- **Community IP**: Query IPs in the GreyNoise dataset (free, limited rate)
 
 ### Enterprise
 
-- **GNQL Query**: GNQL (GreyNoise Query Language)
-  - `Query`: The GNQL query to run
-  - `Limit`: Maximum amount of results to grab (0..10,000)
-- **GNQL Stats**: Get aggregate statistics for the top organizations, actors, tags, ASNs, countries, classifications, and operating systems of all the results of a given GNQL query.
-  - `Query`: The GNQL stats query to run
-  - `Limit`: Maximum amount of results to grab (0..10,000)
-- **IP Context**: Get more information about a given IP address. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.
-  - `IP`: The IP to query
-- **IP Quick Check**: Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.
-  - `IP`: The IP to query
-- **Multi-IP Context**: Get more information about given IP addresses. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.
-  - `IPs`: Comma separated list of IPs to query
-- **Multi-IP Quick Check**: Check whether given IP addresses are “Internet background noise”, or have been observed scanning or attacking devices across the Internet.
-  - `IPs`: Comma separated list of IPs to query
-- **RIOT IP Lookup**: RIOT identifies IPs from known benign services and organizations that commonly cause false positives in network security and threat intelligence products. The collection of IPs in RIOT is continually curated and verified to provide accurate results.
-  - `IP`: The IP to query
-- **Tag Metadata**: Get a list of tags and their respective metadata
+- **IP Lookup**: Get IP enrichment data including metadata, tags, and activity
+  - Optional **Quick Mode** for faster lookups with minimal response
+- **Multi-IP Lookup**: Bulk IP lookup for up to 10,000 IPs
+  - Optional **Quick Mode** for faster lookups with minimal response
+- **GNQL Query**: Search the NOISE dataset using GreyNoise Query Language
+- **GNQL Stats**: Get aggregate statistics for query results (top organizations, actors, tags, ASNs, countries, etc.)
+- **Tag Metadata**: Get a list of all tags and their metadata
 
 ## Credentials
 
-You can use the GreyNoise Community service without authentication, however you will be limited in the number of requests you can send. For more requests, or enterpise functionality, you can [sign-up](https://viz.greynoise.io/signup) for an account.
+You can use the GreyNoise Community API without authentication, however you will be limited in the number of requests you can send. For more requests or enterprise functionality, [sign up](https://viz.greynoise.io/signup) for an account.
 
-- **Token**: The GreyNoise API token
+- **API Key**: Your GreyNoise API key
 
 ## Compatibility
 

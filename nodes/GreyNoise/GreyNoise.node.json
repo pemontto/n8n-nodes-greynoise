@@ -1,17 +1,20 @@
 {
-	"node": "n8n-nodes-base.greynoise",
+	"node": "n8n-nodes-greynoise.greyNoise",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Development", "Developer Tools"],
+	"categories": ["Security"],
+	"subcategories": {
+		"Security": ["Threat Intelligence"]
+	},
 	"resources": {
 		"credentialDocumentation": [
 			{
-				"url": "https://docs.greynoise.io/reference/"
+				"url": "https://docs.greynoise.io/docs/using-the-greynoise-community-api"
 			}
 		],
 		"primaryDocumentation": [
 			{
-				"url": "https://docs.greynoise.io/reference/"
+				"url": "https://docs.greynoise.io/docs/using-the-greynoise-community-api"
 			}
 		]
 	}

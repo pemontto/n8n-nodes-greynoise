@@ -1,20 +1,99 @@
-/* eslint-disable n8n-nodes-base/node-param-operation-option-action-miscased,n8n-nodes-base/node-class-description-icon-not-svg*/
-
 import {
+	IDataObject,
 	IExecuteSingleFunctions,
 	IHttpRequestOptions,
+	IN8nHttpFullResponse,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	NodeConnectionType
+	JsonObject,
+	NodeApiError,
+	NodeConnectionTypes,
 } from 'n8n-workflow';
 
+/**
+ * postReceive hook to handle API errors returned in the response body
+ */
+export async function handleApiError(
+	this: IExecuteSingleFunctions,
+	items: INodeExecutionData[],
+	response: IN8nHttpFullResponse,
+): Promise<INodeExecutionData[]> {
+	const body = response.body as IDataObject;
+
+	// Check for error message in response
+	if (body.message && typeof body.message === 'string') {
+		const message = body.message.toLowerCase();
+		if (
+			message.includes('unauthorized') ||
+			message.includes('forbidden') ||
+			message.includes('invalid') ||
+			message.includes('error')
+		) {
+			throw new NodeApiError(this.getNode(), response as unknown as JsonObject, {
+				message: body.message as string,
+				description: 'The GreyNoise API returned an error. Check your API key and permissions.',
+			});
+		}
+	}
+
+	// Check for error field
+	if (body.error) {
+		throw new NodeApiError(this.getNode(), response as unknown as JsonObject, {
+			message: (body.error as string) || 'API Error',
+			description: body.message as string,
+		});
+	}
+
+	// Check HTTP status code
+	if (response.statusCode >= 400) {
+		throw new NodeApiError(this.getNode(), response as unknown as JsonObject, {
+			message: `HTTP Error ${response.statusCode}`,
+			description: (body.message as string) || 'Request failed',
+		});
+	}
+
+	return items;
+}
+
+/**
+ * preSend hook to convert comma-separated IP string to array for bulk operations
+ */
 export async function buildIPArray(
 	this: IExecuteSingleFunctions,
 	requestOptions: IHttpRequestOptions,
 ): Promise<IHttpRequestOptions> {
 	const ips = this.getNodeParameter('ips') as string;
-	// Create the ips array in the request body
-	requestOptions.body = { ips: ips.split(',') };
+	const operation = this.getNodeParameter('operation') as string;
+
+	// Check for quick mode - v1 uses ipMultiQuick operation, v2 uses quickMode parameter
+	let isQuick = operation === 'ipMultiQuick';
+	if (operation === 'ipMultiLookup') {
+		isQuick = this.getNodeParameter('quickMode', false) as boolean;
+	}
+
+	requestOptions.body = {
+		ips: ips.split(',').map((ip) => ip.trim()),
+		...(isQuick && { quick: true }),
+	};
+
+	return requestOptions;
+}
+
+/**
+ * preSend hook to add quick parameter for single IP lookup
+ */
+export async function addQuickParam(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	const quickMode = this.getNodeParameter('quickMode', false) as boolean;
+
+	if (quickMode) {
+		requestOptions.qs = requestOptions.qs || {};
+		requestOptions.qs.quick = true;
+	}
+
 	return requestOptions;
 }
 
@@ -22,43 +101,36 @@ export class GreyNoise implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'GreyNoise',
 		name: 'greyNoise',
-		icon: 'file:greynoise.png',
+		icon: {
+			light: 'file:../../icons/greynoise.svg',
+			dark: 'file:../../icons/greynoise.dark.svg',
+		},
 		group: ['transform'],
-		version: 1,
-		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Interact with GreyNoise API',
+		version: [1, 2],
+		defaultVersion: 2,
+		subtitle: '={{$parameter["operation"]}}',
+		description: 'Query IPs against GreyNoise threat intelligence',
 		defaults: {
 			name: 'GreyNoise',
 		},
-		inputs: [NodeConnectionType.Main],
-		outputs: [NodeConnectionType.Main],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
 		credentials: [
 			{
-				name: 'greynoiseApi',
+				name: 'greyNoiseApi',
 				required: false,
 			},
 		],
 		requestDefaults: {
 			baseURL: 'https://api.greynoise.io',
-			url: '',
-			// skipSslCertificateValidation: true,
 			headers: {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
 			},
 		},
-		/**
-		 * In the properties array we have two mandatory options objects required
-		 *
-		 * [Resource & Operation]
-		 *
-		 * https://docs.n8n.io/integrations/creating-nodes/code/create-first-node/#resources-and-operations
-		 *
-		 * In our example, the operations are separated into their own file (HTTPVerbDescription.ts)
-		 * to keep this class easy to read.
-		 *
-		 */
 		properties: [
+			// ==================== VERSION 2: RESOURCE SELECTOR ====================
 			{
 				displayName: 'Resource',
 				name: 'resource',
@@ -75,15 +147,22 @@ export class GreyNoise implements INodeType {
 					},
 				],
 				default: 'community',
+				displayOptions: {
+					show: {
+						'@version': [2],
+					},
+				},
 			},
+
+			// ==================== VERSION 2: COMMUNITY OPERATIONS ====================
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-
 				displayOptions: {
 					show: {
+						'@version': [2],
 						resource: ['community'],
 					},
 				},
@@ -92,10 +171,11 @@ export class GreyNoise implements INodeType {
 						name: 'Community IP',
 						value: 'ipCommunity',
 						action: 'Free community IP lookup',
+						description: 'Query IPs in the GreyNoise dataset (free, limited rate)',
 						routing: {
 							request: {
-								// skipSslCertificateValidation: true,
-								url: '=/v3/community/{{ $parameter.ip }}',
+								method: 'GET',
+								url: '=/v3/community/{{$parameter.ip}}',
 								ignoreHttpStatusErrors: true,
 							},
 						},
@@ -103,30 +183,72 @@ export class GreyNoise implements INodeType {
 				],
 				default: 'ipCommunity',
 			},
+
+			// ==================== VERSION 2: ENTERPRISE OPERATIONS ====================
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-
 				displayOptions: {
 					show: {
+						'@version': [2],
 						resource: ['enterprise'],
 					},
 				},
 				options: [
 					{
-						name: 'GNQL Query',
-						value: 'gnqlQuery',
-						action: 'GNQL Query',
-						hint: 'GNQL (GreyNoise Query Language) is a domain-specific query language that uses Lucene deep under the hood. GNQL aims to enable GreyNoise Enterprise and Research users to make complex and one-off queries against the GreyNoise dataset as new business cases arise.',
+						name: 'IP Lookup',
+						value: 'ipLookup',
+						action: 'Look up an IP address',
+						description: 'Get IP enrichment data including metadata, tags, and activity',
 						routing: {
 							request: {
-								url: '=/v2/experimental/gnql',
+								method: 'GET',
+								url: '=/v3/ip/{{$parameter.ip}}',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [addQuickParam],
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'Multi-IP Lookup',
+						value: 'ipMultiLookup',
+						action: 'Look up multiple IP addresses',
+						description: 'Bulk IP lookup for up to 10,000 IPs',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '/v3/ip/',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [buildIPArray],
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'GNQL Query',
+						value: 'gnqlQuery',
+						action: 'Search NOISE dataset using GNQL',
+						description: 'Search NOISE dataset using GreyNoise Query Language',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '/v3/gnql',
 								ignoreHttpStatusErrors: true,
 							},
 							output: {
 								postReceive: [
+									handleApiError,
 									{
 										type: 'rootProperty',
 										properties: {
@@ -140,146 +262,278 @@ export class GreyNoise implements INodeType {
 					{
 						name: 'GNQL Stats',
 						value: 'gnqlStats',
-						action: 'GNQL Stats',
-						hint: 'Get aggregate statistics for the top organizations, actors, tags, ASNs, countries, classifications, and operating systems of all the results of a given GNQL query.',
+						action: 'Get aggregate statistics for query',
+						description: 'Get aggregate statistics for query results',
 						routing: {
 							request: {
-								url: '=/v2/experimental/gnql/stats',
+								method: 'GET',
+								url: '/v2/experimental/gnql/stats', // No v3 replacement available
 								ignoreHttpStatusErrors: true,
 							},
-						},
-					},
-					// {
-					// 	name: 'IP Context',
-					// 	value: 'ipContext',
-					// 	action: 'IP Context',
-					// 	hint: 'Get more information about a given IP address. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.',
-					// 	routing: {
-					// 		request: {
-					// 			url: '=/v2/noise/context/{{ $parameter.ip }}',
-					// 			ignoreHttpStatusErrors: true,
-					// 		},
-					// 	},
-					// },
-					// {
-					// 	name: 'IP Quick Check',
-					// 	value: 'ipQuick',
-					// 	action: 'IP Quick Check',
-					// 	hint: 'Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.',
-					// 	routing: {
-					// 		request: {
-					// 			url: '=/v2/noise/quick/{{ $parameter.ip }}',
-					// 			ignoreHttpStatusErrors: true,
-					// 		},
-					// 	},
-					// },
-					{
-						name: 'IP Context',
-						value: 'ipMultiConext',
-						action: 'IP Context',
-						hint: 'Get more information about a set of IP addresses. Returns time ranges, IP metadata (network owner, ASN, reverse DNS pointer, country), associated actors, activity tags, and raw port scan and web request information.',
-						routing: {
-							request: {
-								method: 'POST',
-								url: '/v2/noise/multi/context',
-								ignoreHttpStatusErrors: true,
-							},
-						},
-					},
-					{
-						name: 'IP Quick Check',
-						value: 'ipMultiQuick',
-						action: 'IP Quick Check',
-						hint: 'Check whether a given IP address is “Internet background noise”, or has been observed scanning or attacking devices across the Internet.',
-						routing: {
-							request: {
-								method: 'POST',
-								url: '=/v2/noise/multi/quick',
-								ignoreHttpStatusErrors: true,
-							},
-						},
-					},
-					{
-						name: 'RIOT IP Lookup',
-						value: 'ipRiot',
-						action: 'RIOT IP Lookup',
-						hint: 'RIOT identifies IPs from known benign services and organizations that commonly cause false positives in network security and threat intelligence products.',
-						routing: {
-							request: {
-								url: '=/v2/riot/{{ $parameter.ip }}',
-								ignoreHttpStatusErrors: true,
+							output: {
+								postReceive: [handleApiError],
 							},
 						},
 					},
 					{
 						name: 'Tag Metadata',
 						value: 'tagMetadata',
-						action: 'Get Tag Metadata',
-						hint: 'Get a list of tags and their respective metadata',
+						action: 'Get list of all tags',
+						description: 'Get list of all tags and their metadata',
 						routing: {
 							request: {
-								url: '/v2/meta/metadata',
+								method: 'GET',
+								url: '/v3/tags',
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+				],
+				default: 'ipLookup',
+			},
+
+			// ==================== VERSION 1: FLAT OPERATION LIST (BACKWARDS COMPAT) ====================
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						'@version': [1],
+					},
+				},
+				options: [
+					// Community
+					{
+						name: 'Community IP',
+						value: 'ipCommunity',
+						action: 'Free community IP lookup',
+						description: 'Query IPs in the GreyNoise dataset (free, limited rate)',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/v3/community/{{$parameter.ip}}',
+								ignoreHttpStatusErrors: true,
+							},
+						},
+					},
+					// Enterprise - Single IP
+					{
+						name: 'IP Context',
+						value: 'ipContext',
+						action: 'Get complete IP enrichment data',
+						description:
+							'Get complete IP enrichment data including metadata, tags, and activity',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/v3/ip/{{$parameter.ip}}',
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'IP Quick Check',
+						value: 'ipQuick',
+						action: 'Fast lookup with minimal response',
+						description: 'Fast lookup with minimal response payload',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/v3/ip/{{$parameter.ip}}',
+								qs: {
+									quick: true,
+								},
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'RIOT IP Lookup',
+						value: 'ipRiot',
+						action: 'Check if IP is from known benign service',
+						description:
+							'Check if IP is from known benign service (CDN, cloud provider, scanner)',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/v3/ip/{{$parameter.ip}}',
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					// Enterprise - Multi IP
+					{
+						name: 'Multi-IP Context',
+						value: 'ipMultiConext', // Preserve original typo!
+						action: 'Bulk IP lookup with full context',
+						description: 'Bulk IP lookup with full context for up to 10,000 IPs',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '/v3/ip/',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [buildIPArray],
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'Multi-IP Quick Check',
+						value: 'ipMultiQuick',
+						action: 'Bulk IP lookup with quick response',
+						description: 'Bulk IP lookup with quick response for up to 10,000 IPs',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '/v3/ip/',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [buildIPArray],
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					// Enterprise - GNQL
+					{
+						name: 'GNQL Query',
+						value: 'gnqlQuery',
+						action: 'Search NOISE dataset using GNQL',
+						description: 'Search NOISE dataset using GreyNoise Query Language',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '/v3/gnql',
+								ignoreHttpStatusErrors: true,
 							},
 							output: {
 								postReceive: [
+									handleApiError,
 									{
 										type: 'rootProperty',
 										properties: {
-											property: 'metadata',
+											property: 'data',
 										},
 									},
 								],
 							},
 						},
 					},
+					{
+						name: 'GNQL Stats',
+						value: 'gnqlStats',
+						action: 'Get aggregate statistics for query',
+						description: 'Get aggregate statistics for query results',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '/v2/experimental/gnql/stats', // No v3 replacement available
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					// Enterprise - Tags
+					{
+						name: 'Tag Metadata',
+						value: 'tagMetadata',
+						action: 'Get list of all tags',
+						description: 'Get list of all tags and their metadata',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '/v3/tags',
+								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
 				],
-				default: 'ipMultiConext',
+				default: 'ipCommunity',
 			},
+
+			// ==================== INPUT FIELDS ====================
+
+			// --- Single IP Input (all single-IP operations, both versions) ---
 			{
 				displayName: 'IP',
-				description: 'IP to query',
-				required: true,
 				name: 'ip',
 				type: 'string',
+				required: true,
 				default: '',
+				placeholder: 'e.g., 8.8.8.8',
+				description: 'IP address to query',
 				displayOptions: {
 					show: {
-						operation: ['ipCommunity', 'ipContext', 'ipQuick', 'ipRiot'],
+						operation: ['ipCommunity', 'ipContext', 'ipQuick', 'ipRiot', 'ipLookup'],
 					},
 				},
 			},
+
+			// --- Multi-IP Input ---
 			{
 				displayName: 'IPs',
-				description: 'IPs to query',
-				required: true,
 				name: 'ips',
 				type: 'string',
+				required: true,
 				default: '',
-				hint: 'Comma separated list of IPs',
+				placeholder: 'e.g., 8.8.8.8, 1.1.1.1, 9.9.9.9',
+				description: 'Comma-separated list of IPs to query (up to 10,000)',
 				displayOptions: {
 					show: {
-						operation: ['ipMultiConext', 'ipMultiQuick'],
-					},
-				},
-				routing: {
-					send: {
-						preSend: [
-							// Parse IPs into an array
-							buildIPArray,
-						],
-						// value: '={{ $parameter.ips.split(",") }}',
-						// property: 'ips',
-						// type: 'body',
+						operation: ['ipMultiConext', 'ipMultiQuick', 'ipMultiLookup'],
 					},
 				},
 			},
+
+			// --- Quick Mode Toggle (v2 only) ---
+			{
+				displayName: 'Quick Mode',
+				name: 'quickMode',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to return a minimal response for faster lookups',
+				displayOptions: {
+					show: {
+						'@version': [2],
+						operation: ['ipLookup', 'ipMultiLookup'],
+					},
+				},
+			},
+
+			// --- GNQL Query Input ---
 			{
 				displayName: 'Query',
-				description: 'GNQL Query',
-				required: true,
 				name: 'query',
 				type: 'string',
+				required: true,
 				default: '',
+				placeholder: 'e.g., classification:malicious tags:mirai',
+				description: 'GNQL query string',
 				displayOptions: {
 					show: {
 						operation: ['gnqlQuery', 'gnqlStats'],
@@ -292,43 +546,14 @@ export class GreyNoise implements INodeType {
 					},
 				},
 			},
-			// {
-			// 	displayName: 'Return All',
-			// 	name: 'returnAll',
-			// 	type: 'boolean',
-			// 	default: false,
-			// 	description: 'Whether to return all results or only up to a given limit',
-			// 	displayOptions: {
-			// 		show: {
-			// 			operation: [
-			// 				'gnqlQuery',
-			// 				'gnqlStats',
-			// 			],
-			// 		},
-			// 	},
-			// 	routing: {
-			// 		send: {
-			// 			paginate: true,
-			// 		},
-			// 		operations: {
-			// 			pagination: {
-			// 				type: 'offset',
-			// 				properties: {
-			// 					limitParameter: 'size',
-			// 					offsetParameter: 'scroll',
-			// 					pageSize: 1,
-			// 					type: 'query',
-			// 				},
-			// 			},
-			// 		},
-			// 	}
-			// },
+
+			// --- GNQL Size Parameter ---
 			{
 				displayName: 'Limit',
-				description: 'Results to return',
 				name: 'size',
 				type: 'number',
 				default: 50,
+				description: 'Max number of results to return',
 				typeOptions: {
 					minValue: 1,
 					maxValue: 10000,
@@ -337,9 +562,6 @@ export class GreyNoise implements INodeType {
 					show: {
 						operation: ['gnqlQuery'],
 					},
-					// hide: {
-					// 	returnAll: [ true ],
-					// }
 				},
 				routing: {
 					send: {
@@ -348,12 +570,14 @@ export class GreyNoise implements INodeType {
 					},
 				},
 			},
+
+			// --- GNQL Stats Count Parameter ---
 			{
 				displayName: 'Count',
-				description: 'Number of top aggregates to grab',
 				name: 'count',
 				type: 'number',
 				default: 50,
+				description: 'Number of top aggregates to return',
 				typeOptions: {
 					minValue: 1,
 					maxValue: 10000,
@@ -362,9 +586,6 @@ export class GreyNoise implements INodeType {
 					show: {
 						operation: ['gnqlStats'],
 					},
-					// hide: {
-					// 	returnAll: [ true ],
-					// }
 				},
 				routing: {
 					send: {
