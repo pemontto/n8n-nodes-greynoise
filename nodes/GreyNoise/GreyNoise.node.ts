@@ -97,6 +97,22 @@ export async function addQuickParam(
 	return requestOptions;
 }
 
+/**
+ * preSend hook to convert comma-separated CVE string to array for bulk operations
+ */
+export async function buildCVEArray(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	const cves = this.getNodeParameter('cves') as string;
+
+	requestOptions.body = {
+		cves: cves.split(',').map((cve) => cve.trim()),
+	};
+
+	return requestOptions;
+}
+
 export class GreyNoise implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'GreyNoise',
@@ -196,20 +212,17 @@ export class GreyNoise implements INodeType {
 						resource: ['enterprise'],
 					},
 				},
-				options: [
+			options: [
 					{
-						name: 'IP Lookup',
-						value: 'ipLookup',
-						action: 'Look up an IP address',
-						description: 'Get IP enrichment data including metadata, tags, and activity',
+						name: 'CVE Lookup',
+						value: 'cveLookup',
+						action: 'Look up CVE information',
+						description: 'Get vulnerability details for a CVE',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/v3/ip/{{$parameter.ip}}',
+								url: '=/v1/cve/{{$parameter.cve}}',
 								ignoreHttpStatusErrors: true,
-							},
-							send: {
-								preSend: [addQuickParam],
 							},
 							output: {
 								postReceive: [handleApiError],
@@ -217,18 +230,18 @@ export class GreyNoise implements INodeType {
 						},
 					},
 					{
-						name: 'Multi-IP Lookup',
-						value: 'ipMultiLookup',
-						action: 'Look up multiple IP addresses',
-						description: 'Bulk IP lookup for up to 10,000 IPs',
+						name: 'Multi-CVE Lookup',
+						value: 'cveMultiLookup',
+						action: 'Look up multiple CVEs',
+						description: 'Bulk CVE lookup for up to 10,000 CVEs',
 						routing: {
 							request: {
 								method: 'POST',
-								url: '/v3/ip/',
+								url: '/v3/cves',
 								ignoreHttpStatusErrors: true,
 							},
 							send: {
-								preSend: [buildIPArray],
+								preSend: [buildCVEArray],
 							},
 							output: {
 								postReceive: [handleApiError],
@@ -269,6 +282,44 @@ export class GreyNoise implements INodeType {
 								method: 'GET',
 								url: '/v2/experimental/gnql/stats', // No v3 replacement available
 								ignoreHttpStatusErrors: true,
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'IP Lookup',
+						value: 'ipLookup',
+						action: 'Look up an IP address',
+						description: 'Get IP enrichment data including metadata, tags, and activity',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/v3/ip/{{$parameter.ip}}',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [addQuickParam],
+							},
+							output: {
+								postReceive: [handleApiError],
+							},
+						},
+					},
+					{
+						name: 'Multi-IP Lookup',
+						value: 'ipMultiLookup',
+						action: 'Look up multiple IP addresses',
+						description: 'Bulk IP lookup for up to 10,000 IPs',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '/v3/ip/',
+								ignoreHttpStatusErrors: true,
+							},
+							send: {
+								preSend: [buildIPArray],
 							},
 							output: {
 								postReceive: [handleApiError],
@@ -521,6 +572,40 @@ export class GreyNoise implements INodeType {
 					show: {
 						'@version': [2],
 						operation: ['ipLookup', 'ipMultiLookup'],
+					},
+				},
+			},
+
+			// --- CVE Input (v2 only) ---
+			{
+				displayName: 'CVE ID',
+				name: 'cve',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: 'e.g., CVE-2024-1234',
+				description: 'CVE ID to query',
+				displayOptions: {
+					show: {
+						'@version': [2],
+						operation: ['cveLookup'],
+					},
+				},
+			},
+
+			// --- Multi-CVE Input (v2 only) ---
+			{
+				displayName: 'CVE IDs',
+				name: 'cves',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: 'e.g., CVE-2024-1234, CVE-2025-5678',
+				description: 'Comma-separated list of CVE IDs to query (up to 10,000)',
+				displayOptions: {
+					show: {
+						'@version': [2],
+						operation: ['cveMultiLookup'],
 					},
 				},
 			},

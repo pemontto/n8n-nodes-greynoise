@@ -25,12 +25,14 @@ See the [n8n community nodes documentation](https://docs.n8n.io/integrations/com
 
 ### Enterprise
 
+- **CVE Lookup**: Get vulnerability details for a CVE
+- **Multi-CVE Lookup**: Bulk CVE lookup for up to 10,000 CVEs
+- **GNQL Query**: Search the NOISE dataset using GreyNoise Query Language
+- **GNQL Stats**: Get aggregate statistics for query results (top organizations, actors, tags, ASNs, countries, etc.)
 - **IP Lookup**: Get IP enrichment data including metadata, tags, and activity
   - Optional **Quick Mode** for faster lookups with minimal response
 - **Multi-IP Lookup**: Bulk IP lookup for up to 10,000 IPs
   - Optional **Quick Mode** for faster lookups with minimal response
-- **GNQL Query**: Search the NOISE dataset using GreyNoise Query Language
-- **GNQL Stats**: Get aggregate statistics for query results (top organizations, actors, tags, ASNs, countries, etc.)
 - **Tag Metadata**: Get a list of all tags and their metadata
 
 ## Credentials
