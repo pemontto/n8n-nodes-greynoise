@@ -58,6 +58,10 @@ export async function handleApiError(
 
 /**
  * preSend hook to convert comma-separated IP string to array for bulk operations
+ * This function handles quick mode logic for backwards compatibility:
+ * - V1 ipMultiQuick operation: always quick
+ * - V1 ipMultiConext operation: never quick
+ * - V2 ipMultiLookup operation: uses quickMode toggle
  */
 export async function buildIPArray(
 	this: IExecuteSingleFunctions,
@@ -66,7 +70,7 @@ export async function buildIPArray(
 	const ips = this.getNodeParameter('ips') as string;
 	const operation = this.getNodeParameter('operation') as string;
 
-	// Check for quick mode - v1 uses ipMultiQuick operation, v2 uses quickMode parameter
+	// Quick mode logic for backwards compatibility with V1 operations
 	let isQuick = operation === 'ipMultiQuick';
 	if (operation === 'ipMultiLookup') {
 		isQuick = this.getNodeParameter('quickMode', false) as boolean;
@@ -74,8 +78,13 @@ export async function buildIPArray(
 
 	requestOptions.body = {
 		ips: ips.split(',').map((ip) => ip.trim()),
-		...(isQuick && { quick: true }),
 	};
+
+	// Quick mode is passed as query parameter, same as single IP lookup
+	if (isQuick) {
+		requestOptions.qs = requestOptions.qs || {};
+		requestOptions.qs.quick = true;
+	}
 
 	return requestOptions;
 }
@@ -111,6 +120,24 @@ export async function buildCVEArray(
 	};
 
 	return requestOptions;
+}
+
+/**
+ * postReceive hook to split root-level array into separate items
+ * For APIs that return a bare array like [{item1}, {item2}]
+ */
+export async function splitRootArray(
+	this: IExecuteSingleFunctions,
+	items: INodeExecutionData[],
+	response: IN8nHttpFullResponse,
+): Promise<INodeExecutionData[]> {
+	const body = response.body;
+
+	if (Array.isArray(body)) {
+		return (body as IDataObject[]).map((item) => ({ json: item }));
+	}
+
+	return items;
 }
 
 export class GreyNoise implements INodeType {
@@ -232,6 +259,7 @@ export class GreyNoise implements INodeType {
 					{
 						name: 'Multi-CVE Lookup',
 						value: 'cveMultiLookup',
+						// eslint-disable-next-line n8n-nodes-base/node-param-operation-option-action-miscased
 						action: 'Look up multiple CVEs',
 						description: 'Bulk CVE lookup for up to 10,000 CVEs',
 						routing: {
@@ -244,7 +272,7 @@ export class GreyNoise implements INodeType {
 								preSend: [buildCVEArray],
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [handleApiError, splitRootArray],
 							},
 						},
 					},
@@ -322,7 +350,15 @@ export class GreyNoise implements INodeType {
 								preSend: [buildIPArray],
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [
+									handleApiError,
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data',
+										},
+									},
+								],
 							},
 						},
 					},
@@ -442,7 +478,15 @@ export class GreyNoise implements INodeType {
 								preSend: [buildIPArray],
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [
+									handleApiError,
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data',
+										},
+									},
+								],
 							},
 						},
 					},
@@ -461,7 +505,15 @@ export class GreyNoise implements INodeType {
 								preSend: [buildIPArray],
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [
+									handleApiError,
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data',
+										},
+									},
+								],
 							},
 						},
 					},
