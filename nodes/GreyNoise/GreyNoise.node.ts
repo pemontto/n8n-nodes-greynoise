@@ -374,7 +374,15 @@ export class GreyNoise implements INodeType {
 								ignoreHttpStatusErrors: true,
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [
+									handleApiError,
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'tags',
+										},
+									},
+								],
 							},
 						},
 					},
@@ -571,7 +579,15 @@ export class GreyNoise implements INodeType {
 								ignoreHttpStatusErrors: true,
 							},
 							output: {
-								postReceive: [handleApiError],
+								postReceive: [
+									handleApiError,
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'tags',
+										},
+									},
+								],
 							},
 						},
 					},
